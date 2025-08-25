@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Conversation Network - 3D Force Graph</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            color: #ffffff;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #graph-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            max-width: 300px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+        }
+
+        #stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+        }
+
+        #conversation-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            max-height: 300px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 101;
+            overflow-y: auto;
+        }
+
+        #conversation-panel.active {
+            transform: translateY(0);
+        }
+
+        .control-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00ffff;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 8px 0;
+            accent-color: #00ffff;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            color: #00ffff;
+            font-size: 12px;
+        }
+
+        button {
+            background: linear-gradient(45deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 200, 200, 0.3) 100%);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #00ffff;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px 0;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, rgba(0, 255, 255, 0.3) 0%, rgba(0, 200, 200, 0.4) 100%);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #00ffff;
+            font-size: 20px;
+            cursor: pointer;
+            width: auto;
+            padding: 5px;
+        }
+
+        .conversation-content {
+            color: #ffffff;
+            line-height: 1.6;
+        }
+
+        .conversation-meta {
+            color: #00ffff;
+            font-size: 12px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .message.user {
+            background: rgba(0, 255, 255, 0.1);
+            border-left-color: #00ffff;
+        }
+
+        .category-legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            font-size: 10px;
+            color: #00ffff;
+        }
+
+        .color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        h3 {
+            color: #00ffff;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .search-box::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00ffff;
+            font-size: 24px;
+            text-align: center;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .neural-pulse {
+            animation: neuralPulse 2s infinite;
+        }
+
+        @keyframes neuralPulse {
+            0%, 100% { 
+                opacity: 1; 
+                text-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+                transform: scale(1);
+            }
+            50% { 
+                opacity: 0.7; 
+                text-shadow: 0 0 40px rgba(0, 255, 255, 0.4);
+                transform: scale(1.05);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="loading">
+            <div class="neural-pulse">🧠 Neural Network Loading...</div>
+            <p>Initializing 3D force graph...</p>
+        </div>
+
+        <div id="graph-container"></div>
+
+        <div id="controls">
+            <h3>⚡ Neural Interface</h3>
+            
+            <div class="control-group">
+                <label>Upload Chat Map JSON</label>
+                <input type="file" id="fileInput" accept=".json" />
+            </div>
+
+            <div class="control-group">
+                <label>Search Conversations</label>
+                <input type="text" id="searchBox" class="search-box" placeholder="Search messages..." />
+            </div>
+
+            <div class="control-group">
+                <label>Node Size: <span id="nodeSizeValue">4</span></label>
+                <input type="range" id="nodeSize" min="2" max="20" value="4" />
+            </div>
+
+            <div class="control-group">
+                <label>Link Distance: <span id="linkDistanceValue">200</span></label>
+                <input type="range" id="linkDistance" min="50" max="500" value="200" />
+            </div>
+
+            <div class="control-group">
+                <label>Force Strength: <span id="forceStrengthValue">-300</span></label>
+                <input type="range" id="forceStrength" min="-1000" max="-50" value="-300" />
+            </div>
+
+            <div class="control-group">
+                <button id="pauseBtn">⏸️ Pause Physics</button>
+                <button id="centerBtn">🎯 Center View</button>
+                <button id="clusterBtn">🌌 Auto Cluster</button>
+                <button id="resetBtn">🔄 Reset Zoom</button>
+            </div>
+        </div>
+
+        <div id="stats">
+            <h3>📊 Network Stats</h3>
+            <div id="statsContent">
+                <p>Conversations: <span id="nodeCount">0</span></p>
+                <p>Connections: <span id="edgeCount">0</span></p>
+                <p>Categories: <span id="categoryCount">0</span></p>
+                <p>Selected: <span id="selectedNode">None</span></p>
+                <div id="categoryLegend" class="category-legend"></div>
+            </div>
+        </div>
+
+        <div id="conversation-panel">
+            <button class="close-btn" id="closePanel">×</button>
+            <div id="conversation-content"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/3d-force-graph@1.70.19/dist/3d-force-graph.min.js"></script>
+    <script>
+        class NeuralConversationGraph {
+            constructor() {
+                this.graph = null;
+                this.graphData = { nodes: [], links: [] };
+                this.originalData = { nodes: [], links: [] };
+                this.searchTerm = '';
+                
+                this.categoryColors = {
+                    technical: '#00ffff',      // bright cyan
+                    general: '#00cccc',        // medium cyan  
+                    learning: '#00ffaa',       // cyan-green
+                    creative: '#66ffcc',       // light cyan-green
+                    business: '#00aaff',       // cyan-blue
+                    personal: '#aaffff',       // light cyan
+                    philosophy: '#88ffff',     // soft cyan
+                    health: '#00ff88'          // cyan-green
+                };
+
+                this.init();
+                this.setupEventListeners();
+            }
+
+            init() {
+                // Check if libraries loaded
+                if (typeof THREE === 'undefined') {
+                    console.error('Three.js failed to load');
+                    document.getElementById('loading').innerHTML = '<div style="color: #ff4444;">Error: Three.js library failed to load<br>Please check your internet connection</div>';
+                    return;
+                }
+                
+                if (typeof ForceGraph3D === 'undefined') {
+                    console.error('3d-force-graph failed to load');
+                    document.getElementById('loading').innerHTML = '<div style="color: #ff4444;">Error: 3D Force Graph library failed to load<br>Please check your internet connection</div>';
+                    return;
+                }
+
+                console.log('Libraries loaded successfully');
+                
+                // Initialize 3D Force Graph
+                try {
+                    this.graph = ForceGraph3D()
+                        (document.getElementById('graph-container'))
+                        .backgroundColor('#000000')
+                        .showNavInfo(false)
+                    .nodeLabel('content')
+                    .nodeColor(node => this.categoryColors[node.category] || '#00ffff')
+                    .nodeOpacity(0.8)
+                    .nodeResolution(16)
+                    .linkColor(() => 'rgba(0, 255, 255, 0.3)')
+                    .linkOpacity(0.3)
+                    .linkWidth(1)
+                    .linkDirectionalParticles(2)
+                    .linkDirectionalParticleSpeed(0.008)
+                    .linkDirectionalParticleWidth(2)
+                    .linkDirectionalParticleColor(() => '#00ffff')
+                    .onNodeClick((node, event) => this.onNodeClick(node, event))
+                    .onNodeHover((node) => this.onNodeHover(node))
+                    .onLinkHover((link) => this.onLinkHover(link))
+                    .d3Force('charge').strength(-300)
+                    .d3Force('link').distance(200);
+
+                // Custom node rendering for glow effect
+                this.graph.nodeThreeObject(node => {
+                    const group = new THREE.Group();
+                    
+                    // Main sphere
+                    const geometry = new THREE.SphereGeometry(node.size || 4, 16, 12);
+                    const material = new THREE.MeshLambertMaterial({
+                        color: this.categoryColors[node.category] || '#00ffff',
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const sphere = new THREE.Mesh(geometry, material);
+                    group.add(sphere);
+                    
+                    // Glow effect
+                    const glowGeometry = new THREE.SphereGeometry((node.size || 4) * 1.5, 16, 12);
+                    const glowMaterial = new THREE.MeshLambertMaterial({
+                        color: this.categoryColors[node.category] || '#00ffff',
+                        transparent: true,
+                        opacity: 0.2
+                    });
+                    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                    group.add(glow);
+
+                    // Store reference for animation
+                    node.threeObject = group;
+                    return group;
+                });
+
+                    // Add lighting for better visibility
+                    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                    this.graph.scene().add(ambientLight);
+                    
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+                    directionalLight.position.set(1, 1, 1);
+                    this.graph.scene().add(directionalLight);
+
+                    console.log('Graph initialized successfully');
+
+                    // Hide loading
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, 1000);
+
+                    // Start animation loop
+                    this.animate();
+                    
+                } catch (error) {
+                    console.error('Error initializing graph:', error);
+                    document.getElementById('loading').innerHTML = '<div style="color: #ff4444;">Error initializing 3D graph<br>Check browser console for details</div>';
+                }
+            }
+
+            setupEventListeners() {
+                // File upload
+                document.getElementById('fileInput').addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.loadGraphData(file);
+                    }
+                });
+
+                // Search
+                document.getElementById('searchBox').addEventListener('input', (e) => {
+                    this.searchTerm = e.target.value.toLowerCase();
+                    this.filterNodes();
+                });
+
+                // Controls
+                document.getElementById('nodeSize').addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById('nodeSizeValue').textContent = value;
+                    this.updateNodeSizes(value);
+                });
+
+                document.getElementById('linkDistance').addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById('linkDistanceValue').textContent = value;
+                    this.graph.d3Force('link').distance(value);
+                    this.graph.d3ReheatSimulation();
+                });
+
+                document.getElementById('forceStrength').addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById('forceStrengthValue').textContent = value;
+                    this.graph.d3Force('charge').strength(value);
+                    this.graph.d3ReheatSimulation();
+                });
+
+                // Buttons
+                document.getElementById('pauseBtn').addEventListener('click', () => {
+                    this.togglePhysics();
+                });
+
+                document.getElementById('centerBtn').addEventListener('click', () => {
+                    this.centerView();
+                });
+
+                document.getElementById('clusterBtn').addEventListener('click', () => {
+                    this.autoCluster();
+                });
+
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    this.resetZoom();
+                });
+
+                document.getElementById('closePanel').addEventListener('click', () => {
+                    this.closeConversationPanel();
+                });
+            }
+
+            async loadGraphData(file) {
+                try {
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    
+                    console.log('Loading graph data:', data);
+                    
+                    // Process nodes with conversation content
+                    this.originalData.nodes = (data.nodes || []).map((node, index) => ({
+                        id: node.id || index,
+                        category: node.category || 'general',
+                        content: node.content || node.message || `Message ${index}`,
+                        messages: node.messages || [{ content: node.content || `Message ${index}`, role: 'user' }],
+                        timestamp: node.timestamp || new Date().toISOString(),
+                        importance: node.importance || Math.random(),
+                        size: Math.max(3, (node.importance || Math.random()) * 8)
+                    }));
+
+                    // Process links/edges
+                    this.originalData.links = (data.links || data.edges || []).map(link => ({
+                        source: link.source,
+                        target: link.target,
+                        strength: link.strength || link.weight || 1
+                    }));
+
+                    this.graphData = JSON.parse(JSON.stringify(this.originalData));
+                    
+                    // Update graph
+                    this.graph.graphData(this.graphData);
+                    this.updateStats();
+                    
+                    console.log(`Loaded ${this.graphData.nodes.length} nodes and ${this.graphData.links.length} links`);
+                    
+                } catch (error) {
+                    console.error('Error loading graph data:', error);
+                    alert('Error loading graph data. Please check the JSON format.');
+                }
+            }
+
+            onNodeClick(node, event) {
+                console.log('Node clicked:', node);
+                
+                // Update selected node in stats
+                document.getElementById('selectedNode').textContent = `Node ${node.id}`;
+                
+                // Show conversation panel
+                this.showConversationPanel(node);
+                
+                // Highlight node
+                this.highlightNode(node);
+            }
+
+            onNodeHover(node) {
+                // Update cursor and highlight
+                document.body.style.cursor = node ? 'pointer' : 'auto';
+                
+                if (node && node.threeObject) {
+                    // Pulse effect on hover
+                    const scale = node ? 1.2 : 1;
+                    node.threeObject.scale.setScalar(scale);
+                }
+            }
+
+            onLinkHover(link) {
+                // Could add link highlighting here
+            }
+
+            showConversationPanel(node) {
+                const panel = document.getElementById('conversation-panel');
+                const content = document.getElementById('conversation-content');
+                
+                // Build conversation content
+                let html = `
+                    <div class="conversation-meta">
+                        <strong>Node ID:</strong> ${node.id}<br>
+                        <strong>Category:</strong> <span style="color: ${this.categoryColors[node.category]}">${node.category}</span><br>
+                        <strong>Timestamp:</strong> ${new Date(node.timestamp).toLocaleString()}<br>
+                        <strong>Importance:</strong> ${(node.importance * 100).toFixed(1)}%
+                    </div>
+                    <div class="conversation-content">
+                `;
+                
+                if (node.messages && node.messages.length > 0) {
+                    node.messages.forEach(message => {
+                        html += `
+                            <div class="message ${message.role || 'user'}">
+                                <strong>${message.role || 'User'}:</strong><br>
+                                ${message.content || message.text || ''}
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `
+                        <div class="message">
+                            <strong>Content:</strong><br>
+                            ${node.content}
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                content.innerHTML = html;
+                panel.classList.add('active');
+            }
+
+            closeConversationPanel() {
+                document.getElementById('conversation-panel').classList.remove('active');
+                document.getElementById('selectedNode').textContent = 'None';
+            }
+
+            highlightNode(node) {
+                // Reset all nodes
+                this.graphData.nodes.forEach(n => {
+                    if (n.threeObject) {
+                        n.threeObject.children[0].material.opacity = 0.8;
+                        n.threeObject.children[1].material.opacity = 0.2;
+                    }
+                });
+                
+                // Highlight selected node
+                if (node.threeObject) {
+                    node.threeObject.children[0].material.opacity = 1;
+                    node.threeObject.children[1].material.opacity = 0.4;
+                }
+            }
+
+            filterNodes() {
+                if (!this.searchTerm) {
+                    this.graphData = JSON.parse(JSON.stringify(this.originalData));
+                } else {
+                    const filteredNodes = this.originalData.nodes.filter(node => 
+                        node.content.toLowerCase().includes(this.searchTerm) ||
+                        node.category.toLowerCase().includes(this.searchTerm) ||
+                        (node.messages && node.messages.some(msg => 
+                            (msg.content || '').toLowerCase().includes(this.searchTerm)
+                        ))
+                    );
+                    
+                    const nodeIds = new Set(filteredNodes.map(n => n.id));
+                    const filteredLinks = this.originalData.links.filter(link => 
+                        nodeIds.has(link.source) && nodeIds.has(link.target)
+                    );
+                    
+                    this.graphData = {
+                        nodes: filteredNodes,
+                        links: filteredLinks
+                    };
+                }
+                
+                this.graph.graphData(this.graphData);
+                this.updateStats();
+            }
+
+            updateNodeSizes(baseSize) {
+                this.graphData.nodes.forEach(node => {
+                    const size = baseSize * (node.importance || 0.5);
+                    node.size = Math.max(2, size);
+                    
+                    if (node.threeObject) {
+                        node.threeObject.children[0].geometry = new THREE.SphereGeometry(size, 16, 12);
+                        node.threeObject.children[1].geometry = new THREE.SphereGeometry(size * 1.5, 16, 12);
+                    }
+                });
+            }
+
+            togglePhysics() {
+                const btn = document.getElementById('pauseBtn');
+                if (this.graph.d3Force('center')) {
+                    this.graph.pauseAnimation();
+                    btn.textContent = '▶️ Resume Physics';
+                } else {
+                    this.graph.resumeAnimation();
+                    btn.textContent = '⏸️ Pause Physics';
+                }
+            }
+
+            centerView() {
+                this.graph.cameraPosition({ x: 0, y: 0, z: 1000 });
+            }
+
+            resetZoom() {
+                this.graph.zoomToFit(1000);
+            }
+
+            autoCluster() {
+                // Group by category and position in clusters
+                const categories = {};
+                this.graphData.nodes.forEach(node => {
+                    if (!categories[node.category]) categories[node.category] = [];
+                    categories[node.category].push(node);
+                });
+
+                const radius = 300;
+                const angleStep = (2 * Math.PI) / Object.keys(categories).length;
+                let angle = 0;
+
+                Object.entries(categories).forEach(([category, nodes]) => {
+                    const centerX = Math.cos(angle) * radius;
+                    const centerY = Math.sin(angle) * radius;
+                    const centerZ = 0;
+
+                    nodes.forEach((node, i) => {
+                        const localAngle = (i / nodes.length) * 2 * Math.PI;
+                        const localRadius = 100;
+                        
+                        // Set fixed positions
+                        node.fx = centerX + Math.cos(localAngle) * localRadius;
+                        node.fy = centerY + Math.sin(localAngle) * localRadius;
+                        node.fz = centerZ + (Math.random() - 0.5) * 50;
+                    });
+
+                    angle += angleStep;
+                });
+
+                this.graph.d3ReheatSimulation();
+                
+                // Release fixed positions after clustering
+                setTimeout(() => {
+                    this.graphData.nodes.forEach(node => {
+                        delete node.fx;
+                        delete node.fy;
+                        delete node.fz;
+                    });
+                }, 3000);
+            }
+
+            updateStats() {
+                document.getElementById('nodeCount').textContent = this.graphData.nodes.length;
+                document.getElementById('edgeCount').textContent = this.graphData.links.length;
+                
+                const categories = [...new Set(this.graphData.nodes.map(n => n.category))];
+                document.getElementById('categoryCount').textContent = categories.length;
+                
+                // Update legend
+                const legend = document.getElementById('categoryLegend');
+                legend.innerHTML = '';
+                categories.forEach(category => {
+                    const item = document.createElement('div');
+                    item.className = 'category-item';
+                    
+                    const dot = document.createElement('div');
+                    dot.className = 'color-dot';
+                    dot.style.backgroundColor = this.categoryColors[category] || '#00ffff';
+                    
+                    const label = document.createElement('span');
+                    label.textContent = category;
+                    
+                    item.appendChild(dot);
+                    item.appendChild(label);
+                    legend.appendChild(item);
+                });
+            }
+
+            animate() {
+                // Add pulsing animation to nodes
+                const time = Date.now() * 0.001;
+                
+                this.graphData.nodes.forEach((node, index) => {
+                    if (node.threeObject) {
+                        const pulse = Math.sin(time * 2 + index * 0.1) * 0.2 + 0.8;
+                        node.threeObject.children[1].material.opacity = 0.2 * pulse;
+                        
+                        // Rotate glow
+                        node.threeObject.children[1].rotation.x += 0.01;
+                        node.threeObject.children[1].rotation.y += 0.005;
+                    }
+                });
+                
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Generate demo data for testing
+        function generateDemoData() {
+            const categories = ['technical', 'general', 'learning', 'creative', 'business', 'personal'];
+            const nodes = [];
+            const links = [];
+            
+            // Generate realistic conversation nodes
+            for (let i = 0; i < 50; i++) {
+                const category = categories[Math.floor(Math.random() * categories.length)];
+                const messages = [];
+                
+                // Generate conversation messages
+                const messageCount = Math.floor(Math.random() * 5) + 1;
+                for (let j = 0; j < messageCount; j++) {
+                    messages.push({
+                        role: j % 2 === 0 ? 'user' : 'assistant',
+                        content: `This is message ${j + 1} in conversation ${i + 1} about ${category} topics. ` +
+                                `It contains detailed discussion about various aspects of the subject matter.`
+                    });
+                }
+                
+                nodes.push({
+                    id: i,
+                    category: category,
+                    content: `Conversation ${i + 1}: ${category} discussion`,
+                    messages: messages,
+                    timestamp: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
+                    importance: Math.random()
+                });
+            }
+            
+            // Generate links based on category similarity and temporal proximity
+            for (let i = 0; i < 80; i++) {
+                const source = Math.floor(Math.random() * nodes.length);
+                let target = Math.floor(Math.random() * nodes.length);
+                
+                // Bias towards same category
+                if (Math.random() < 0.6) {
+                    const sameCategory = nodes.filter(n => n.category === nodes[source].category);
+                    if (sameCategory.length > 1) {
+                        target = sameCategory[Math.floor(Math.random() * sameCategory.length)].id;
+                    }
+                }
+                
+                if (target !== source) {
+                    links.push({
+                        source: source,
+                        target: target,
+                        strength: Math.random()
+                    });
+                }
+            }
+            
+            return { nodes, links };
+        }
+
+        // Initialize the neural graph
+        const neuralGraph = new NeuralConversationGraph();
+
+        // Load demo data after initialization
+        setTimeout(() => {
+            if (neuralGraph.graphData.nodes.length === 0) {
+                console.log('Loading demo conversation data...');
+                const demoData = generateDemoData();
+                
+                // Simulate loading from file
+                const blob = new Blob([JSON.stringify(demoData)], { type: 'application/json' });
+                const file = new File([blob], 'demo_chat_map.json', { type: 'application/json' });
+                neuralGraph.loadGraphData(file);
+            }
+        }, 1500);
+    </script>
+</body>
+</html>
